@@ -156,7 +156,7 @@ models/cnn.pt   trained CNN
 - One component. A model is trained per component, from its CAD model only.
 - Single images. Close-ups would profit from a short image sequence or a depth sensor.
 
-## References
+## References for further reading
 
 - J. Shotton et al., Scene Coordinate Regression Forests for Camera Relocalization in RGB-D Images, CVPR 2013.
 - X. Li et al., Hierarchical Scene Coordinate Classification and Regression for Visual Localization, CVPR 2020.
