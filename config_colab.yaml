@@ -1,0 +1,36 @@
+# Colab / GPU version of config.yaml: same part, references and test captures, bigger CNN training.
+
+part:
+  mesh: null            # path to your own STL/OBJ (in millimetres); null = built-in bracket
+  regions: 12           # named surface regions for traceability (k-means on the surface)
+
+camera:
+  width: 192
+  height: 192
+  fov_deg: 50
+
+references:             # plain CAD renders with known pose, for retrieval, features and the forest
+  n: 2000
+  seed: 1
+  max_roll_deg: 20      # camera roughly upright (gravity sensor); null = any roll
+
+cnn:
+  train_images: 12000   # 4x the CPU run: CAD renders with randomised texture, light, noise, blur and occluders
+  epochs: 40
+  width: 32             # a somewhat wider network
+  patches: 64           # surface patches the network classifies before regressing the offset
+  seed: 7
+  model_file: cnn_colab.pt   # keeps models/cnn.pt (the CPU model) for comparison
+
+forest:
+  trees: 32
+  pixels_per_image: 150
+
+test:
+  per_condition: 200    # "real" captures per condition: random texture the CAD does not have
+  seed: 100
+  texture: 0.05
+  tolerance_mm: 10.0    # a capture counts as located if its centre lands within this distance
+  strict_mm: 5.0        # reported as well
+
+methods: [retrieval, features, forest, cnn]

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cadloc"
+version = "0.1.0"
+description = "Localise images captured from a physical component on its CAD model"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy", "scipy", "pandas", "pyyaml", "scikit-learn", "scikit-image", "opencv-python-headless",
+  "trimesh", "manifold3d", "shapely", "open3d", "plotly", "torch",
+]
+
+[project.scripts]
+cadloc = "cadloc.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+typeCheckingMode = "basic"
