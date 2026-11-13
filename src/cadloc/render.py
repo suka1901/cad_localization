@@ -34,6 +34,7 @@ class Capture:
     target: np.ndarray           # true 3D point at the image centre (the "data point")
     target_region: int
     meta: dict = field(default_factory=dict)
+    hidden: np.ndarray | None = None   # (H, W) bool: pixels covered by clutter (test captures with occlusion)
 
     @property
     def mask(self) -> np.ndarray:
@@ -118,7 +119,8 @@ def look_at(eye: np.ndarray, target: np.ndarray, rng: np.random.Generator,
 
 def sample_capture(renderer: Renderer, rng: np.random.Generator, dist_mm: tuple[float, float],
                    max_tilt_deg: float = 60, light: str = "camera", max_roll_deg: float | None = None,
-                   tries: int = 50, **render_kw) -> Capture:
+                   tries: int = 50, min_visible: float = 0.3, spot_tol_mm: float = 1.0,
+                   **render_kw) -> Capture:
     """A capture of a random spot on the surface, as an inspector or a scanner would take it."""
     mesh = renderer.part.mesh
     area_p = mesh.area_faces / mesh.area_faces.sum()
@@ -143,7 +145,7 @@ def sample_capture(renderer: Renderer, rng: np.random.Generator, dist_mm: tuple[
             ldir = np.array([rng.uniform(-1, 1), rng.uniform(-1, 1), -rng.uniform(0.2, 1)])
         cap = renderer.render(R, t, ldir, rng, **render_kw)
         # keep captures where the centre ray hits the chosen spot (not hidden) and enough of the part is visible
-        if cap.target_region >= 0 and np.linalg.norm(cap.target - p) < 1.0 and cap.mask.mean() > 0.3:
+        if cap.target_region >= 0 and np.linalg.norm(cap.target - p) < spot_tol_mm and cap.mask.mean() > min_visible:
             cap.meta = {"distance_mm": float(np.linalg.norm(eye - p)), "tilt_deg": float(np.degrees(tilt)),
                         "light": light}
             return cap

@@ -26,6 +26,8 @@ class Estimate:
     R: np.ndarray | None
     t: np.ndarray | None
     inliers: int = 0           # confidence: RANSAC inliers (or descriptor similarity x 100 for retrieval)
+    residual_px: float = float("nan")   # CAD edge fit (cnn_fit only): median edge distance, px; lower is better
+    agreement: float = float("nan")     # CAD edge fit (cnn_fit only): share of CAD edges found in the image
 
 
 def _descriptor(img: np.ndarray) -> np.ndarray:

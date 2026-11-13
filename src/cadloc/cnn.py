@@ -175,22 +175,26 @@ class CNN:
         return self
 
     @torch.no_grad()
-    def correspondences(self, img: np.ndarray, top: int = 2) -> tuple[np.ndarray, np.ndarray]:
-        """2D-3D pairs for every part cell; the `top` most likely patches each give a candidate for RANSAC."""
+    def cells(self, img: np.ndarray) -> dict[str, np.ndarray]:
+        """Raw prediction for every output cell: is it the part, which surface patches (best first), the offset."""
         x = torch.from_numpy(_prep(img)[None, None]).to(self.device)
         out = self.net(x)[0].cpu().numpy()
         k = self.k
-        fg = out[k + 3].reshape(-1) > 0
-        logits = out[:k].reshape(k, -1).T[fg]
-        off = out[k:k + 3].reshape(3, -1).T[fg]
-        uv = self.grid_uv[fg]
-        best = np.argsort(-logits, axis=1)[:, :top]
-        pts2, pts3 = [], []
-        for j in range(best.shape[1]):
-            c = best[:, j]
-            pts2.append(uv)
-            pts3.append(self.centers[c] + off * self.radius[c, None])
-        return np.vstack(pts2), np.vstack(pts3)
+        return {"uv": self.grid_uv, "part": out[k + 3].reshape(-1) > 0,
+                "patches": np.argsort(-out[:k].reshape(k, -1).T, axis=1),
+                "offset": out[k:k + 3].reshape(3, -1).T}
+
+    def points(self, cells: dict[str, np.ndarray], rank: int = 0) -> np.ndarray:
+        """The 3D point (part frame, mm) each cell shows, using its rank-th most likely patch."""
+        c = cells["patches"][:, rank]
+        return self.centers[c] + cells["offset"] * self.radius[c, None]
+
+    def correspondences(self, img: np.ndarray, top: int = 2) -> tuple[np.ndarray, np.ndarray]:
+        """2D-3D pairs for every part cell; the `top` most likely patches each give a candidate for RANSAC."""
+        c = self.cells(img)
+        fg = c["part"]
+        return (np.vstack([c["uv"][fg]] * top),
+                np.vstack([self.points(c, j)[fg] for j in range(top)]))
 
     def locate(self, img: np.ndarray) -> Estimate:
         return _pnp(*self.correspondences(img), self.cam.K, reproj_px=6.0, iters=1000)

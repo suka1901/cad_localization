@@ -1,6 +1,7 @@
 """Fast checks of the geometry, the data and the evaluation (no long training)."""
 from __future__ import annotations
 
+import cv2
 import numpy as np
 import pytest
 
@@ -109,3 +110,66 @@ def test_captures_are_repeatable(setup):
     a = make_test_set(r, "occlusion", 3, seed=11)
     b = make_test_set(r, "occlusion", 3, seed=11)
     assert all(np.array_equal(x.image, y.image) and np.allclose(x.target, y.target) for x, y in zip(a, b))
+
+
+# --- predictability and interpretability: CAD fit, error budget, localisability, held-out, calibration ---
+
+def test_cad_edge_fit_pulls_a_disturbed_pose_back(setup):
+    from cadloc.fit import EdgeModel, fit_pose
+    _, _, r = setup
+    rng = np.random.default_rng(6)
+    cap = sample_capture(r, rng, (80, 140))
+    edges = EdgeModel(r)
+    assert len(edges.visible(cap.R, cap.t)) > 50
+    R0 = cv2.Rodrigues(cv2.Rodrigues(cap.R)[0] + np.array([[0.02], [-0.015], [0.01]]))[0]
+    t0 = cap.t + np.array([2.0, -2.0, 3.0])
+    f = fit_pose(edges, cap.image, R0, t0)
+    before = np.linalg.norm(-R0.T @ t0 + cap.R.T @ cap.t)
+    after = np.linalg.norm(-f.R.T @ f.t + cap.R.T @ cap.t)
+    assert f.agreement >= f.start_agreement and after < before
+
+
+def test_error_budget_gives_a_cause_per_capture(setup):
+    torch = pytest.importorskip("torch")
+    from cadloc.cnn import CNN, training_renders
+    from cadloc.diagnose import CAUSES, budget_table, error_budget
+    part, cam, r = setup
+    torch.manual_seed(0)
+    model = CNN(cam, part, width=8, patches=16).fit(training_renders(r, 16, 0), epochs=1, batch=8, log=lambda *_: None)
+    eb = error_budget(model, r, {"nominal": make_test_set(r, "nominal", 2, seed=8)})
+    assert set(eb["cause"]) <= set(CAUSES) and len(eb) == 2
+    assert (eb["error_oracle_cnn_mm"] < 1.0).all()         # true points give the pose: the geometry is not the limit
+    assert "located: full pipeline" in budget_table(eb).columns
+
+
+def test_calibration_scores_and_one_class():
+    from cadloc.calibration import Logistic, accept_rule, scores
+    rng = np.random.default_rng(0)
+    p = rng.random(4000)
+    y = rng.random(4000) < p                               # perfectly calibrated by construction
+    s = scores(p, y)
+    assert s["ece"] < 0.03 and s["auc"] > 0.7
+    assert accept_rule(p, y)["accepted_located"].iloc[-1] > 0.9
+    lr = Logistic().fit(rng.random((10, 2)), np.zeros(10))
+    assert np.allclose(lr.predict(rng.random((3, 2))), 0.0)
+
+
+def test_localisability_features_are_in_range(setup):
+    from cadloc.data import reference_set
+    from cadloc.localisability import FEATURES, view_features
+    from cadloc.methods import Retrieval
+    _, _, r = setup
+    ret = Retrieval(reference_set(r, 40, 2))
+    cap = sample_capture(r, np.random.default_rng(7), (60, 150))
+    f = view_features(r, cap.R, cap.t, ret)
+    assert set(f) == set(FEATURES)
+    assert 0 <= f["edges"] <= 1 and 0 < f["coverage"] <= 1 and f["orientations"] >= 0 and -1 <= f["look_alike"] <= 1
+
+
+def test_out_of_range_sets(setup):
+    from cadloc.validation import SETS, out_of_range
+    _, _, r = setup
+    r2, caps = out_of_range(r, "wide lens (65 deg)", 2, 1)
+    assert r2.cam.fov_deg == 65 and len(caps) == 2
+    _, far = out_of_range(r, "farther (200-300 mm)", 2, 1)
+    assert all(c.meta["distance_mm"] >= 200 for c in far) and len(SETS) == 4

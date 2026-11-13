@@ -33,6 +33,7 @@ def run(methods: list, conditions: dict[str, list[Capture]], renderer: Renderer)
                 est = m.locate(cap.image)
                 ms = 1000 * (time.perf_counter() - t0)
                 row = {"condition": cond, "capture": i, "method": m.name, "ms": ms, "confidence": est.inliers,
+                       "fit_residual_px": est.residual_px, "edge_agreement": est.agreement,
                        "true_region": cap.target_region, "distance_mm": cap.meta["distance_mm"],
                        "found": False, "centre_error_mm": np.nan, "rotation_error_deg": np.nan,
                        "camera_error_mm": np.nan, "region_correct": False, "est_x": np.nan, "est_y": np.nan,

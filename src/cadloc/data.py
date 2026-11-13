@@ -25,7 +25,7 @@ def reference_set(renderer: Renderer, n: int, seed: int, dist=(40, 200), max_rol
             for i in range(n)]
 
 
-def _occlude(img: np.ndarray, frac: float, rng: np.random.Generator) -> np.ndarray:
+def _occlude(img: np.ndarray, frac: float, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
     """Cover about `frac` of the image with clutter (a hand, a fixture), keeping the centre visible."""
     h, w = img.shape
     out = img.copy()
@@ -42,7 +42,7 @@ def _occlude(img: np.ndarray, frac: float, rng: np.random.Generator) -> np.ndarr
         clutter = (np.clip(ramp + rng.normal(0, 0.08, (bh, bw)), 0, 1) * 255).astype(np.uint8)
         out[y0:y0 + bh, x0:x0 + bw] = np.where(box[y0:y0 + bh, x0:x0 + bw], clutter, out[y0:y0 + bh, x0:x0 + bw])
         covered |= box
-    return out
+    return out, covered
 
 
 def test_set(renderer: Renderer, condition: str, n: int, seed: int, max_roll_deg: float | None = 20,
@@ -57,7 +57,7 @@ def test_set(renderer: Renderer, condition: str, n: int, seed: int, max_roll_deg
         cap = sample_capture(renderer, rng, c["dist"], light=c["light"], max_roll_deg=roll, texture=texture, **kw)
         img = cap.image
         if "occlude" in c:
-            img = _occlude(img, rng.uniform(*c["occlude"]), rng)
+            img, cap.hidden = _occlude(img, rng.uniform(*c["occlude"]), rng)
         if "blur" in c:
             img = cv2.GaussianBlur(img, (0, 0), c["blur"])
         if "gain" in c:

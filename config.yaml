@@ -32,4 +32,18 @@ test:
   tolerance_mm: 10.0    # a capture counts as located if its centre lands within this distance
   strict_mm: 5.0        # reported as well
 
-methods: [retrieval, features, forest, cnn]
+fit:                    # cnn_fit: the CNN proposes poses, the CAD edges refine and check them
+  hypotheses: 3         # candidate poses from RANSAC; the one whose CAD edges agree best with the image wins
+  anchor_weight: 0.3    # how strongly the fit stays near the CNN's points (the CAD edges decide)
+  stages: [20, 8, 4]    # coarse to fine: edge distances above this many px count as missing edges
+
+analysis:               # make the results predictable and interpretable (see README)
+  enabled: true
+  calibration_per_condition: 150   # separate captures (new seeds) for fitting the confidence model
+  calibration_seed: 500
+  heldout_per_set: 200
+  heldout_seed: 900
+  map_spots: 600        # spots on the surface for the CAD-only localisability map
+  map_seed: 3
+
+methods: [retrieval, features, forest, cnn, cnn_fit]
